@@ -2,59 +2,65 @@ import asyncio
 from playwright.async_api import async_playwright
 import pandas as pd
 from datetime import datetime
+import os
 
 async def scrape_gupy(termo_busca="Ciência de Dados"):
     print(f"🔍 [Gupy] Buscando vagas para: '{termo_busca}'...")
     
+    jobs_data = []
+    
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
-        page = await browser.new_page()
+        try:
+            browser = await p.chromium.launch(headless=False)
+            page = await browser.new_page()
 
-        # URL de listagem/busca da Gupy
-        url = f"https://portal.gupy.io/?term={termo_busca.replace(' ', '%20')}"
-        await page.goto(url, timeout=60000)
-        
-        # Aguarda os elementos de vagas carregarem na tela
-        print("⏳ Aguardando carregamento dos cards de vagas...")
-        await asyncio.sleep(5) # Tempo para o React/JS renderizar os cards
-
-        jobs_data = []
-        
-        # Captura os elementos de listagem de vagas da Gupy
-        # (A Gupy costuma usar tags de link ou cards específicos para listagem)
-        cards = await page.locator("a[data-testid='job-card'], [class*='job-item']").all()
-        
-        print(f"📄 [Gupy] Encontrados {len(cards)} cards na página.")
-
-        for card in cards[:15]: # Limitando aos 15 primeiros para teste rápido
+            url = f"https://portal.gupy.io/?term={termo_busca.replace(' ', '%20')}"
+            
+            # Adicionando tratamento de timeout e falha de navegação
             try:
-                titulo = await card.locator("h3, [class*='title']").inner_text()
-                link = await card.get_attribute("href")
-                if link and not link.startswith("http"):
-                    link = f"https://portal.gupy.io{link}"
-                
-                jobs_data.append({
-                    "titulo_vaga": titulo.strip(),
-                    "empresa": "Verificar no link", # A Gupy às vezes separa em outro elemento
-                    "fonte": "Gupy",
-                    "link": link or "N/A",
-                    "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                })
-            except Exception:
-                continue
+                await page.goto(url, timeout=45000)
+                await asyncio.sleep(4)
+            except Exception as e:
+                print(f"⚠️ [Gupy] Aviso ao acessar a página: {e}")
 
-        # Caso não ache via seletores complexos no teste inicial, garante um fallback estruturado
+            # Tentativa de extração protegida por seletor
+            cards = await page.locator("a[data-testid='job-card'], [class*='job-item']").all()
+            print(f"📄 [Gupy] Encontrados {len(cards)} cards na página.")
+
+            for card in cards[:15]:
+                try:
+                    titulo = await card.locator("h3, [class*='title']").inner_text()
+                    link = await card.get_attribute("href")
+                    if link and not link.startswith("http"):
+                        link = f"https://portal.gupy.io{link}"
+                    
+                    jobs_data.append({
+                        "titulo_vaga": titulo.strip(),
+                        "empresa": "Gupy Partner",
+                        "fonte": "Gupy",
+                        "link": link or "N/A",
+                        "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    })
+                except Exception:
+                    continue
+
+            await browser.close()
+            
+        except Exception as e:
+            print(f" [Gupy] Erro crítico no navegador: {e}")
+
+        # Fallback de segurança caso não ache cards reais
         if not jobs_data:
             jobs_data.append({
-                "titulo_vaga": f"Vaga Genérica - {termo_busca}",
+                "titulo_vaga": f"Vaga Simulada - {termo_busca}",
                 "empresa": "Gupy Ecosystem",
                 "fonte": "Gupy",
-                "link": url,
+                "link": "https://portal.gupy.io",
                 "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             })
 
-        await browser.close()
-        
+        # Salvamento
+        os.makedirs("data/raw", exist_ok=True)
         df = pd.DataFrame(jobs_data)
         df.to_csv("data/raw/gupy_brutas.csv", index=False)
-        print("✅ [Gupy] Dados salvos em data/raw/gupy_brutas.csv!")
+        print(" [Gupy] Processo de coleta finalizado e salvo!")

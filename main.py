@@ -2,27 +2,29 @@ import asyncio
 from src.gupy_scraper import scrape_gupy
 from src.linkedin_scraper import scrape_linkedin
 from src.parser import process_jobs_data
-from src.analyzer import analyze_jobs # <-- Importando o novo módulo
+from src.analyzer import analyze_jobs
 
 async def main():
-    print("========================================")
-    print("  INICIANDO PIPELINE MULTI-FONTE")
-    print("========================================")
+    print("="*50)
+    print("  🚀 PIPELINE MULTI-FONTE DE VAGAS (TERMINAL)")
+    print("="*50 + "\n")
     
-    print("\n Coletando vagas na Gupy...")
-    await scrape_gupy("Ciência de Dados")
+    termo = "Ciência de Dados"  # Termo padrão para execução via terminal
+    print(f"🎯 Executando pipeline para o termo padrão: '{termo}'\n")
+
+    print("--- PASSO 1: INGESTÃO E COLETA ---")
+    await scrape_gupy(termo)
+    await scrape_linkedin(termo)
     
-    print("\n Coletando vagas no LinkedIn...")
-    await scrape_linkedin("Python")
-    
-    print("\n[Passo 3/4] Consolidando e limpando os dados...")
+    print("\n--- PASSO 2: PROCESSAMENTO E ETL ---")
     process_jobs_data()
     
-    print("\n[Passo 4/4] Analisando dados e gerando insights...")
-    analyze_jobs() # <-- Executando a análise
+    print("\n--- PASSO 3: ANÁLISE DE MERCADO ---")
+    analyze_jobs()
     
-    print("\n========================================")
-    print(" PIPELINE CONCLUÍDO COM SUCESSO!")
-    print("========================================")
+    print("\n" + "="*50)
+    print("✨ PIPELINE CONCLUÍDO COM SUCESSO!")
+    print("="*50)
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

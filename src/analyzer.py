@@ -1,16 +1,15 @@
 import pandas as pd
 import os
-from collections import Counter
 import re
 
 def analyze_jobs():
-    """Analisa as vagas tratadas e extrai insights de mercado (como tecnologias mais pedidas)."""
+    """Analisa as vagas tratadas e extrai um ranking avançado de tecnologias (Skills) via NLP/Regex."""
     input_path = "data/processed/vagas_tratadas.csv"
     
-    print("📈 Iniciando a análise de dados e extração de skills...")
+    print("📈 Iniciando a análise avançada de dados e extração de skills...")
     
     if not os.path.exists(input_path):
-        print("❌ Arquivo de vagas tratadas não encontrado.")
+        print("❌ Arquivo de vagas tratadas não encontrado. Execute o pipeline completo.")
         return
 
     df = pd.read_csv(input_path)
@@ -19,31 +18,44 @@ def analyze_jobs():
         print("⚠️ O DataFrame está vazio ou sem a coluna de títulos.")
         return
 
-    # Lista de tecnologias/termos comuns para procurar nos títulos e descrições
-    skills_alvo = [
-        "Python", "SQL", "AWS", "Machine Learning", "Docker", 
-        "React", "FastAPI", "Pandas", "Java", "C++", "Power BI"
-    ]
+    total_vagas = len(df)
     
-    # Juntando todo o texto dos títulos para contagem
+    
+    skills_alvo = {
+        "Linguagens": ["Python", "SQL", "Java", "C++", "JavaScript", "TypeScript", "R"],
+        "Data Science & ML": ["Machine Learning", "Pandas", "NumPy", "TensorFlow", "PyTorch", "Scikit-Learn"],
+        "Cloud & DevOps": ["AWS", "Docker", "Kubernetes", "Azure", "GCP"],
+        "Banco de Dados & BI": ["PostgreSQL", "MySQL", "Power BI", "Tableau", "MongoDB"]
+    }
+    
+    # Junta todo o texto de todas as vagas disponíveis na base tratada
     texto_geral = " ".join(df["titulo_vaga"].dropna().astype(str).tolist()).lower()
     
-    print("\n----------------------------------------")
-    print("  📊 INSIGHTS DE MERCADO (TOP TERMOS)")
-    print("----------------------------------------")
+    print("\n" + "="*50)
+    print("  📊 RELATÓRIO DE INTELIGÊNCIA DE MERCADO (SKILLS)")
+    print(f"  Total de vagas analisadas na base: {total_vagas}")
+    print("="*50)
     
-    encontrados = []
-    for skill in skills_alvo:
-        # Conta quantas vezes a skill aparece de forma isolada/case-insensitive
-        matches = len(re.findall(r'\b' + re.escape(skill.lower()) + r'\b', texto_geral))
-        if matches > 0:
-            encontrados.append((skill, matches))
-            
-    # Ordena do mais frequente para o menos frequente
-    encontrados.sort(key=lambda x: x[1], reverse=True)
-    
-    for skill, freq in encontrados:
-        print(f"  • {skill}: mencionado em {freq} ocorrência(s)")
+    for categoria, skills in skills_alvo.items():
+        print(f"\n📂 [{categoria}]")
+        encontrados_cat = []
         
-    print("----------------------------------------")
-    print("✨ Análise concluída com sucesso!")
+        for skill in skills:
+            
+            matches = len(re.findall(r'\b' + re.escape(skill.lower()) + r'\b', texto_geral))
+            if matches > 0:
+                # Calcula a porcentagem de aparição em relação ao total de vagas
+                porcentagem = (matches / total_vagas) * 100 if total_vagas > 0 else 0
+                encontrados_cat.append((skill, matches, porcentagem))
+                
+        # Ordena do mais frequente para o menos frequente dentro da categoria
+        encontrados_cat.sort(key=lambda x: x[1], reverse=True)
+        
+        if encontrados_cat:
+            for skill, freq, pct in encontrados_cat:
+                print(f"  • {skill:<18} ➔ Mencionado em {freq} vaga(s) ({pct:.1f}%)")
+        else:
+            print("  (Nenhuma skill desta categoria encontrada nas vagas atuais)")
+            
+    print("\n" + "="*50)
+    print("✨ Análise avançada concluída com sucesso!")
