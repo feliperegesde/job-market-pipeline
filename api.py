@@ -27,10 +27,13 @@ async def run_pipeline(termo: str):
     process_jobs_data()
 
 @app.post("/api/scrape")
-async def trigger_scrape(termo: str = "Ciência de Dados"):
+async def trigger_scrape(termo: str = "Ciência de Dados", pais: str = "Brasil"):
     try:
-        await run_pipeline(termo)
-        return {"message": f"Coleta e processamento concluídos para: {termo}"}
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: asyncio.run(scrape_gupy(termo)))
+        await loop.run_in_executor(None, lambda: asyncio.run(scrape_linkedin(termo, pais)))
+        process_jobs_data()
+        return {"message": f"Coleta concluída para '{termo}' em '{pais}'"}
     except Exception as e:
         return {"error": str(e)}, 500
 

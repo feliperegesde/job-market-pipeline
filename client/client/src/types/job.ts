@@ -6,4 +6,5 @@ export interface Job {
   data_coleta: string;
   localizacao?: string;
   descricao?: string;
+  nivel?: string; // Estágio, Junior, Pleno, Senior
 }

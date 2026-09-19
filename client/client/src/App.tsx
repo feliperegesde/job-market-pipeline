@@ -38,9 +38,11 @@ const getCompanyStyles = (empresa: string) => {
 function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('Ciência de Dados');
+  const [paisScrape, setPaisScrape] = useState<string>('Brasil');
   const [loading, setLoading] = useState<boolean>(false);
   const [filterText, setFilterText] = useState<string>('');
   const [selectedSource, setSelectedSource] = useState<string>('ALL');
+  const [selectedNivel, setSelectedNivel] = useState<string>('ALL');
 
   const currentDateTime = '19/09/2026 • 15:42';
 
@@ -62,7 +64,7 @@ function App() {
     setLoading(true);
     try {
       await axios.post(`${API_URL}/scrape`, null, {
-        params: { termo: searchTerm },
+        params: { termo: searchTerm, pais: paisScrape },
       });
       await fetchJobs();
     } catch (error) {
@@ -77,8 +79,13 @@ function App() {
     const matchesSearch =
       job.titulo_vaga.toLowerCase().includes(filterText.toLowerCase()) ||
       job.empresa.toLowerCase().includes(filterText.toLowerCase());
-    const matchesSource = selectedSource === 'ALL' || job.fonte.toLowerCase() === selectedSource.toLowerCase();
-    return matchesSearch && matchesSource;
+    
+    const matchesSource = selectedSource === 'ALL' || job.fonte.toLowerCase().includes(selectedSource.toLowerCase());
+    
+    const nivelVaga = job.nivel ? job.nivel.toLowerCase() : '';
+    const matchesNivel = selectedNivel === 'ALL' || nivelVaga.includes(selectedNivel.toLowerCase());
+
+    return matchesSearch && matchesSource && matchesNivel;
   });
 
   const totalJobs = jobs.length;
@@ -169,7 +176,7 @@ function App() {
           </div>
         </div>
 
-        {/* Bloco de Disparar Scraping */}
+        {/* Bloco de Disparar Scraping com Seletor de País */}
         <div className="bg-[#0b1329] border border-blue-950/40 p-5 rounded-2xl shadow-lg space-y-3">
           <h2 className="text-xs font-bold text-slate-300 flex items-center gap-2 uppercase tracking-wider m-0">
             <Search size={15} className="text-blue-500" /> Disparar Scraping
@@ -183,6 +190,17 @@ function App() {
               className="flex-1 bg-[#050811] border border-blue-950/60 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-200 placeholder-slate-500 transition"
               placeholder="CARGO OU TECNOLOGIA"
             />
+            
+            <select
+              value={paisScrape}
+              onChange={(e) => setPaisScrape(e.target.value)}
+              className="bg-[#050811] border border-blue-950/60 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-300 cursor-pointer"
+            >
+              <option value="Brasil">🇧🇷 Brasil</option>
+              <option value="Estados Unidos">🇺🇸 Estados Unidos</option>
+              <option value="Global">🌍 Global / Todos</option>
+            </select>
+
             <button
               type="submit"
               disabled={loading}
@@ -194,9 +212,27 @@ function App() {
           </form>
         </div>
 
-        {/* Bloco de Filtros Dinâmicos */}
-        <div className="bg-[#0b1329] border border-blue-950/40 p-5 rounded-2xl shadow-lg space-y-3">
-          <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider m-0">Filtros Dinâmicos</h2>
+        {/* Bloco de Filtros Dinâmicos & Pílulas de Senioridade */}
+        <div className="bg-[#0b1329] border border-blue-950/40 p-5 rounded-2xl shadow-lg space-y-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+            <h2 className="text-xs font-bold text-slate-300 uppercase tracking-wider m-0">Filtros Dinâmicos & Senioridade</h2>
+            
+            <div className="flex flex-wrap gap-2">
+              {['ALL', 'Estágio', 'Junior', 'Pleno', 'Senior'].map((nivel) => (
+                <button
+                  key={nivel}
+                  onClick={() => setSelectedNivel(nivel)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border ${
+                    selectedNivel === nivel
+                      ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30'
+                      : 'bg-[#050811] text-slate-400 border-blue-950/60 hover:border-blue-700 hover:text-slate-200'
+                  }`}
+                >
+                  {nivel === 'ALL' ? 'Todos os Níveis' : nivel}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
             <div className="md:col-span-3">
@@ -212,7 +248,7 @@ function App() {
               <select
                 value={selectedSource}
                 onChange={(e) => setSelectedSource(e.target.value)}
-                className="w-full bg-[#050811] border border-blue-950/60 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-300"
+                className="w-full bg-[#050811] border border-blue-950/60 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 text-slate-300 cursor-pointer"
               >
                 <option value="ALL">Todas as Fontes</option>
                 <option value="gupy">Gupy</option>
@@ -248,7 +284,14 @@ function App() {
                 {filteredJobs.length > 0 ? (
                   filteredJobs.map((job, index) => (
                     <tr key={index} className="hover:bg-blue-950/10 transition">
-                      <td className="py-4 px-4 font-semibold text-slate-200">{job.titulo_vaga}</td>
+                      <td className="py-4 px-4 font-semibold text-slate-200">
+                        {job.titulo_vaga}
+                        {job.nivel && job.nivel !== 'Não Especificado' && (
+                          <span className="ml-2 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-blue-400 border border-slate-700">
+                            {job.nivel}
+                          </span>
+                        )}
+                      </td>
                       <td className="py-4 px-4 text-slate-300 flex items-center gap-2">
                         <span
                           className={`w-5 h-5 rounded-md font-bold text-[10px] flex items-center justify-center ${getCompanyStyles(
@@ -287,7 +330,7 @@ function App() {
                 ) : (
                   <tr>
                     <td colSpan={4} className="py-8 px-4 text-center text-slate-500 text-sm">
-                      Nenhuma vaga encontrada. Execute uma coleta para começar.
+                      Nenhuma vaga encontrada para este filtro. Tente mudar o país ou executar uma nova coleta.
                     </td>
                   </tr>
                 )}

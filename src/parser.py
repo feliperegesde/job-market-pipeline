@@ -1,5 +1,18 @@
-import pandas as pd
 import os
+import pandas as pd
+import re
+
+def classificar_senioridade(titulo):
+    titulo_lower = str(titulo).lower()
+    if any(k in titulo_lower for k in ['estágio', 'estagio', 'intern', 'trainee']):
+        return 'Estágio'
+    elif any(k in titulo_lower for k in ['júnior', 'junior', 'jr']):
+        return 'Junior'
+    elif any(k in titulo_lower for k in ['pleno', 'mid', 'ii', 'med']):
+        return 'Pleno'
+    elif any(k in titulo_lower for k in ['sênior', 'senior', 'sr', 'lead', 'principal', 'head', 'architect']):
+        return 'Senior'
+    return 'Não Especificado'
 
 def process_jobs_data():
     """Lê os dados brutos de múltiplas fontes, padroniza textos, remove nulos e consolida."""
@@ -36,7 +49,6 @@ def process_jobs_data():
     # 3. Tratamento de Valores Nulos (Missing Values)
     if "titulo_vaga" in df_combined.columns:
         df_combined = df_combined.dropna(subset=["titulo_vaga"])
-        # Preenche valores nulos em colunas secundárias com texto padrão
         df_combined["empresa"] = df_combined["empresa"].fillna("Não informada")
         df_combined["link"] = df_combined["link"].fillna("N/A")
     
@@ -50,7 +62,10 @@ def process_jobs_data():
     # 5. Remoção Inteligente de Duplicadas
     df_combined = df_combined.drop_duplicates(subset=["titulo_vaga", "empresa"], keep="first")
 
-    # 6. Salvamento na pasta processada
+    # 6. Classificação Automática de Senioridade
+    df_combined["nivel"] = df_combined["titulo_vaga"].apply(classificar_senioridade)
+
+    # 7. Salvamento na pasta processada
     os.makedirs("data/processed", exist_ok=True)
     df_combined.to_csv(output_path, index=False)
     

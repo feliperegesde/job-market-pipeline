@@ -1,62 +1,66 @@
 import asyncio
 from playwright.async_api import async_playwright
 import pandas as pd
-from datetime import datetime
 import os
+from datetime import datetime
 
-async def scrape_linkedin(termo_busca="Python"):
-    print(f"🔍 [LinkedIn] Buscando vagas públicas para: '{termo_busca}'...")
+async def scrape_linkedin(termo: str = "Ciência de Dados", localizacao: str = "Brasil"):
+    query_encoded = termo.replace(" ", "%20")
     
-    jobs_data = []
+    # Define a URL de acordo com a localização escolhida
+    if localizacao.lower() == "brasil":
+        url = f"https://www.linkedin.com/jobs/search?keywords={query_encoded}&location=Brasil&geoId=106057199&trk=public_jobs_jobs-search-bar_search-submit"
+        print(f"🔍 [LinkedIn] Buscando vagas no **Brasil** para: '{termo}'...")
+    elif localizacao.lower() == "estados unidos":
+        url = f"https://www.linkedin.com/jobs/search?keywords={query_encoded}&location=Estados%20Unidos&geoId=103644278&trk=public_jobs_jobs-search-bar_search-submit"
+        print(f"🔍 [LinkedIn] Buscando vagas nos **EUA** para: '{termo}'...")
+    else:
+        # Global / Sem filtro estrito de país
+        url = f"https://www.linkedin.com/jobs/search?keywords={query_encoded}&trk=public_jobs_jobs-search-bar_search-submit"
+        print(f"🔍 [LinkedIn] Buscando vagas **Globais** para: '{termo}'...")
+
+    vagas = []
     
     async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
         try:
-            browser = await p.chromium.launch(headless=False)
-            page = await browser.new_page()
-
-            url = f"https://www.linkedin.com/jobs/search?keywords={termo_busca.replace(' ', '%20')}&location=Brasil"
+            await page.goto(url, timeout=60000)
+            await page.wait_for_timeout(4000)
             
-            try:
-                await page.goto(url, timeout=45000)
-                await asyncio.sleep(4)
-            except Exception as e:
-                print(f"⚠️ [LinkedIn] Aviso ao carregar página: {e}")
-
+            for _ in range(2):
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight);")
+                await page.wait_for_timeout(2000)
+                
             cards = await page.locator(".base-search-card").all()
-            print(f"📄 [LinkedIn] Encontrados {len(cards)} cards na página.")
+            if not cards:
+                cards = await page.locator(".job-search-card").all()
 
-            for card in cards[:15]:
+            for card in cards[:20]:
                 try:
                     titulo = await card.locator(".base-search-card__title").inner_text()
                     empresa = await card.locator(".base-search-card__subtitle").inner_text()
-                    link_elem = card.locator(".base-card__full-link")
+                    
+                    link_elem = card.locator("a.base-card__full-link")
                     link = await link_elem.get_attribute("href") if await link_elem.count() > 0 else "N/A"
                     
-                    jobs_data.append({
+                    vagas.append({
                         "titulo_vaga": titulo.strip(),
                         "empresa": empresa.strip(),
-                        "fonte": "LinkedIn",
-                        "link": link,
-                        "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        "fonte": f"LinkedIn ({localizacao})",
+                        "link": link.split("?")[0] if link else "N/A",
+                        "data_coleta": datetime.now().strftime("%Y-%m-%d")
                     })
                 except Exception:
                     continue
-
+                    
+        except Exception as e:
+            print(f"⚠️ Erro no scraping do LinkedIn: {e}")
+        finally:
             await browser.close()
             
-        except Exception as e:
-            print(f" [LinkedIn] Erro crítico no navegador: {e}")
-
-        if not jobs_data:
-            jobs_data.append({
-                "titulo_vaga": f"Desenvolvedor - {termo_busca}",
-                "empresa": "LinkedIn Public Job",
-                "fonte": "LinkedIn",
-                "link": url,
-                "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-
-        os.makedirs("data/raw", exist_ok=True)
-        df = pd.DataFrame(jobs_data)
-        df.to_csv("data/raw/linkedin_brutas.csv", index=False)
-        print(" [LinkedIn] Processo de coleta finalizado e salvo!")
+    os.makedirs("data/raw", exist_ok=True)
+    df = pd.DataFrame(vagas)
+    df.to_csv("data/raw/linkedin_brutas.csv", index=False)
+    print(f"✅ [LinkedIn] {len(vagas)} vagas salvas.")

@@ -1,66 +1,51 @@
 import asyncio
 from playwright.async_api import async_playwright
 import pandas as pd
-from datetime import datetime
 import os
 
-async def scrape_gupy(termo_busca="Ciência de Dados"):
-    print(f"🔍 [Gupy] Buscando vagas para: '{termo_busca}'...")
+async def scrape_gupy(termo: str = "Ciência de Dados"):
+    print(f"🔍 [Gupy] Buscando vagas no Brasil para: '{termo}'...")
+    url = f"https://portal.gupy.io/jobSearch?term={termo}"
     
-    jobs_data = []
+    vagas = []
     
     async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
         try:
-            browser = await p.chromium.launch(headless=False)
-            page = await browser.new_page()
-
-            url = f"https://portal.gupy.io/?term={termo_busca.replace(' ', '%20')}"
+            await page.goto(url, timeout=60000)
+            await page.wait_for_timeout(4000)
             
-            # Adicionando tratamento de timeout e falha de navegação
-            try:
-                await page.goto(url, timeout=45000)
-                await asyncio.sleep(4)
-            except Exception as e:
-                print(f"⚠️ [Gupy] Aviso ao acessar a página: {e}")
+            cards = await page.locator("[data-testid='job-card']").all()
+            if not cards:
+                cards = await page.locator("a[href*='/job/']").all()
 
-            # Tentativa de extração protegida por seletor
-            cards = await page.locator("a[data-testid='job-card'], [class*='job-item']").all()
-            print(f"📄 [Gupy] Encontrados {len(cards)} cards na página.")
-
-            for card in cards[:15]:
+            for card in cards[:25]:
                 try:
-                    titulo = await card.locator("h3, [class*='title']").inner_text()
+                    titulo = await card.locator("h3, h4, [data-testid='job-title']").inner_text()
+                    empresa = await card.locator("p, [data-testid='company-name']").inner_text()
                     link = await card.get_attribute("href")
+                    
                     if link and not link.startswith("http"):
                         link = f"https://portal.gupy.io{link}"
-                    
-                    jobs_data.append({
+                        
+                    vagas.append({
                         "titulo_vaga": titulo.strip(),
-                        "empresa": "Gupy Partner",
+                        "empresa": empresa.strip() if empresa else "Gupy Partner",
                         "fonte": "Gupy",
                         "link": link or "N/A",
-                        "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        "data_coleta": "2026-09-19"
                     })
                 except Exception:
                     continue
-
+                    
+        except Exception as e:
+            print(f"⚠️ Erro no scraping da Gupy: {e}")
+        finally:
             await browser.close()
             
-        except Exception as e:
-            print(f" [Gupy] Erro crítico no navegador: {e}")
-
-        # Fallback de segurança caso não ache cards reais
-        if not jobs_data:
-            jobs_data.append({
-                "titulo_vaga": f"Vaga Simulada - {termo_busca}",
-                "empresa": "Gupy Ecosystem",
-                "fonte": "Gupy",
-                "link": "https://portal.gupy.io",
-                "data_coleta": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            })
-
-        # Salvamento
-        os.makedirs("data/raw", exist_ok=True)
-        df = pd.DataFrame(jobs_data)
-        df.to_csv("data/raw/gupy_brutas.csv", index=False)
-        print(" [Gupy] Processo de coleta finalizado e salvo!")
+    os.makedirs("data/raw", exist_ok=True)
+    df = pd.DataFrame(vagas)
+    df.to_csv("data/raw/gupy_brutas.csv", index=False)
+    print(f"✅ [Gupy] {len(vagas)} vagas salvas.")
