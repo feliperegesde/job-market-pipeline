@@ -4,4 +4,6 @@ export interface Job {
   fonte: string;
   link: string;
   data_coleta: string;
+  localizacao?: string;
+  descricao?: string;
 }
