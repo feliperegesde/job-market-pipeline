@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { Job } from './types/job';
-import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers } from 'lucide-react';
+import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers, Linkedin, Github } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -340,7 +340,7 @@ function App() {
         </div>
       </div>
 
-      {/* Rodapé */}
+      {/* Rodapé da Página com links para LinkedIn e GitHub */}
       <footer className="max-w-7xl w-full mx-auto border-t border-blue-950/60 pt-6 pb-4 flex flex-col md:flex-row justify-between items-center text-xs text-slate-400 gap-4 mt-12">
         <div>
           <span className="font-extrabold text-slate-200 tracking-wider">JOB SEEKER</span>
@@ -349,6 +349,27 @@ function App() {
             Desenvolvido por <strong className="text-slate-300 font-semibold">Felipe Reges De Albuquerque</strong>
           </span>
         </div>
+
+        {/* Links Sociais (LinkedIn e GitHub) */}
+        <div className="flex items-center gap-4">
+          <a 
+            href="https://www.linkedin.com/in/felipe-albuquerque-66334b280/" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-slate-300 hover:text-blue-400 transition font-medium bg-[#0b1329] px-3 py-1.5 rounded-lg border border-blue-950/60"
+          >
+            <Linkedin size={14} className="text-blue-400" /> LinkedIn
+          </a>
+          <a 
+            href="https://github.com/feliperegesde" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-slate-300 hover:text-white transition font-medium bg-[#0b1329] px-3 py-1.5 rounded-lg border border-blue-950/60"
+          >
+            <Github size={14} className="text-slate-200" /> GitHub
+          </a>
+        </div>
+
         <div className="flex items-center gap-2 font-medium">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span className="text-slate-300">Sistema Ativo</span>
