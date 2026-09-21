@@ -297,6 +297,18 @@ The frontend communicates with the FastAPI backend through REST endpoints.
 
 ---
 
+### 5. 🤖 AI Match Engine (Machine Learning & NLP)
+
+The platform features an integrated Artificial Intelligence module designed to evaluate candidate compatibility against scraped vacancies in real time.
+
+Using **Natural Language Processing (NLP)** and **Machine Learning**, the pipeline performs:
+
+* **PDF & Text Ingestion:** Automated parsing of curriculum documents via `pypdf` or direct text input.
+* **TF-IDF Vectorization:** Transforming job requirements and candidate skills into weighted numerical feature vectors using `scikit-learn`.
+* **Cosine Similarity Scoring:** Calculating mathematical proximity angles between the candidate profile and job listings.
+* **Smart Score Normalization:** Dynamically scaling and ranking vacancies to present an intuitive percentage match score (`match_score`) directly on the dashboard.
+
+
 ## 🔄 Data Flow
 
 ```text
