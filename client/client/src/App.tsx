@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { Job } from './types/job';
-import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers, Linkedin, Github } from 'lucide-react';
+import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers, Linkedin, Github, Sparkles } from 'lucide-react';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -44,12 +44,19 @@ function App() {
   const [selectedSource, setSelectedSource] = useState<string>('ALL');
   const [selectedNivel, setSelectedNivel] = useState<string>('ALL');
 
+  // Estados do Match com IA (Machine Learning / PDF)
+  const [curriculoTexto, setCurriculoTexto] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isMatching, setIsMatching] = useState<boolean>(false);
+  const [modoMatchAtivo, setModoMatchAtivo] = useState<boolean>(false);
+
   const currentDateTime = '19/09/2026 • 15:42';
 
   const fetchJobs = async () => {
     try {
       const response = await axios.get(`${API_URL}/jobs`);
       setJobs(response.data);
+      setModoMatchAtivo(false);
     } catch (error) {
       console.error('Erro ao buscar vagas:', error);
     }
@@ -72,6 +79,36 @@ function App() {
       alert('Erro ao executar a coleta.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCalculateMatch = async () => {
+    if (!curriculoTexto.trim() && !selectedFile) {
+      alert('Cole o texto do currículo ou selecione um arquivo PDF!');
+      return;
+    }
+
+    setIsMatching(true);
+    const formData = new FormData();
+    if (selectedFile) {
+      formData.append('file', selectedFile);
+    } else {
+      formData.append('curriculo_texto', curriculoTexto);
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/match`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setJobs(response.data);
+      setModoMatchAtivo(true);
+    } catch (error) {
+      console.error('Erro ao calcular match:', error);
+      alert('Erro ao processar o match com IA.');
+    } finally {
+      setIsMatching(false);
     }
   };
 
@@ -212,6 +249,69 @@ function App() {
           </form>
         </div>
 
+        {/* Bloco de IA Match Engine (PDF ou Texto) */}
+        <div className="bg-[#0b1329] border border-purple-950/50 p-5 rounded-2xl shadow-lg space-y-3">
+          <h2 className="text-xs font-bold text-purple-300 flex items-center gap-2 uppercase tracking-wider m-0">
+            <Sparkles size={15} className="text-purple-400" /> IA Match Engine (Upload de Currículo PDF ou Texto)
+          </h2>
+          
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <textarea
+                rows={2}
+                value={curriculoTexto}
+                onChange={(e) => {
+                  setCurriculoTexto(e.target.value);
+                  if (e.target.value) setSelectedFile(null);
+                }}
+                placeholder="Ou cole seu currículo aqui (Python, React, Data Science...)"
+                className="w-full bg-[#050811] border border-purple-950/60 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-500 text-slate-200 placeholder-slate-500 transition resize-none"
+              />
+              
+              <div className="flex flex-col justify-center bg-[#050811] border border-dashed border-purple-950/80 rounded-xl px-4 py-3 text-sm">
+                <label className="text-xs text-purple-300 font-semibold mb-1 cursor-pointer flex items-center gap-2">
+                  <span>📄 Selecionar Currículo em PDF</span>
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setSelectedFile(e.target.files[0]);
+                        setCurriculoTexto('');
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-xs text-slate-400 truncate">
+                  {selectedFile ? `Arquivo: ${selectedFile.name}` : 'Nenhum arquivo selecionado'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+              {modoMatchAtivo ? (
+                <span className="text-xs text-purple-400 font-semibold animate-pulse flex items-center gap-1">
+                  ✨ Vagas ordenadas por compatibilidade de IA (PDF/Texto)!
+                </span>
+              ) : (
+                <span className="text-xs text-slate-400">
+                  Envie seu PDF ou cole o texto para classificar as vagas por similaridade inteligente.
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleCalculateMatch}
+                disabled={isMatching}
+                className="bg-purple-600 hover:bg-purple-500 disabled:bg-purple-800 text-white font-bold px-6 py-2.5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-purple-600/25 text-sm cursor-pointer ml-auto"
+              >
+                {isMatching ? <RefreshCw className="animate-spin" size={16} /> : <Sparkles size={16} />}
+                {isMatching ? 'Processando Documento...' : 'Calcular Match com IA'}
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Bloco de Filtros Dinâmicos & Pílulas de Senioridade */}
         <div className="bg-[#0b1329] border border-blue-950/40 p-5 rounded-2xl shadow-lg space-y-4">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
@@ -277,6 +377,7 @@ function App() {
                   <th className="py-3 px-4 font-bold">Cargo / Vaga</th>
                   <th className="py-3 px-4 font-bold">Empresa</th>
                   <th className="py-3 px-4 font-bold">Fonte</th>
+                  {modoMatchAtivo && <th className="py-3 px-4 font-bold text-center">Match IA</th>}
                   <th className="py-3 px-4 font-bold text-right">Ação</th>
                 </tr>
               </thead>
@@ -311,6 +412,19 @@ function App() {
                           @{job.fonte}
                         </span>
                       </td>
+                      {modoMatchAtivo && (
+                        <td className="py-4 px-4 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-black ${
+                            (job.match_score ?? 0) > 20 
+                              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                              : (job.match_score ?? 0) > 5 
+                              ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+                              : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            {job.match_score ?? 0}%
+                          </span>
+                        </td>
+                      )}
                       <td className="py-4 px-4 text-right">
                         {job.link && job.link !== 'N/A' ? (
                           <a
@@ -329,7 +443,7 @@ function App() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} className="py-8 px-4 text-center text-slate-500 text-sm">
+                    <td colSpan={modoMatchAtivo ? 5 : 4} className="py-8 px-4 text-center text-slate-500 text-sm">
                       Nenhuma vaga encontrada para este filtro. Tente mudar o país ou executar uma nova coleta.
                     </td>
                   </tr>

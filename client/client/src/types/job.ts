@@ -7,4 +7,5 @@ export interface Job {
   localizacao?: string;
   descricao?: string;
   nivel?: string; // Estágio, Junior, Pleno, Senior
+  match_score?: number;
 }
