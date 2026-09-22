@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import type { Job } from './types/job';
-import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers, Linkedin, Github, Sparkles } from 'lucide-react';
+import { Search, Play, RefreshCw, Briefcase, Building, ExternalLink, Layers, Linkedin, Github, Sparkles, Download, X, Eye, BarChart3, PieChart as PieIcon } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 const API_URL = 'http://localhost:8000/api';
 
@@ -35,6 +36,8 @@ const getCompanyStyles = (empresa: string) => {
   return styles[key] ?? 'bg-slate-800 text-slate-300 border border-slate-700';
 };
 
+const COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ec4899'];
+
 function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('Ciência de Dados');
@@ -44,11 +47,12 @@ function App() {
   const [selectedSource, setSelectedSource] = useState<string>('ALL');
   const [selectedNivel, setSelectedNivel] = useState<string>('ALL');
 
-  // Estados do Match com IA (Machine Learning / PDF)
+  // Estados de IA, Modal e Analytics
   const [curriculoTexto, setCurriculoTexto] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isMatching, setIsMatching] = useState<boolean>(false);
   const [modoMatchAtivo, setModoMatchAtivo] = useState<boolean>(false);
+  const [vagaSelecionada, setVagaSelecionada] = useState<Job | null>(null);
 
   const currentDateTime = '19/09/2026 • 15:42';
 
@@ -112,6 +116,37 @@ function App() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (filteredJobs.length === 0) {
+      alert('Não há vagas para exportar.');
+      return;
+    }
+
+    const headers = ['titulo_vaga', 'empresa', 'fonte', 'nivel', 'match_score', 'link'];
+    const csvRows = [headers.join(',')];
+
+    filteredJobs.forEach(job => {
+      const row = [
+        `"${job.titulo_vaga?.replace(/"/g, '""') || ''}"`,
+        `"${job.empresa?.replace(/"/g, '""') || ''}"`,
+        `"${job.fonte || ''}"`,
+        `"${job.nivel || 'Não Especificado'}"`,
+        job.match_score ?? 'N/A',
+        `"${job.link || ''}"`
+      ];
+      csvRows.push(row.join(','));
+    });
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'vagas_exportadas_jobseeker.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const filteredJobs = jobs.filter((job) => {
     const matchesSearch =
       job.titulo_vaga.toLowerCase().includes(filterText.toLowerCase()) ||
@@ -125,6 +160,39 @@ function App() {
     return matchesSearch && matchesSource && matchesNivel;
   });
 
+  // Analytics computados para os gráficos
+  const analyticsData = useMemo(() => {
+    const techKeywords = ['Python', 'SQL', 'React', 'AWS', 'Machine Learning', 'Java', 'Docker', 'TypeScript', 'Node.js', 'Pandas'];
+    const counts: Record<string, number> = {};
+    techKeywords.forEach(t => counts[t] = 0);
+
+    jobs.forEach(job => {
+      const text = (job.titulo_vaga + " " + job.empresa).toLowerCase();
+      techKeywords.forEach(tech => {
+        if (text.includes(tech.toLowerCase())) {
+          counts[tech] = (counts[tech] || 0) + 1;
+        }
+      });
+    });
+
+    const barData = Object.keys(counts).map(tech => ({
+      name: tech,
+      vagas: counts[tech]
+    })).filter(item => item.vagas > 0).sort((a, b) => b.vagas - a.vagas);
+
+    const nivelCounts: Record<string, number> = { 'Junior': 0, 'Pleno': 0, 'Senior': 0, 'Estágio': 0, 'Não Especificado': 0 };
+    jobs.forEach(job => {
+      const niv = job.nivel && job.nivel !== 'Não Especificado' ? job.nivel : 'Não Especificado';
+      nivelCounts[niv] = (nivelCounts[niv] || 0) + 1;
+    });
+
+    const pieData = Object.keys(nivelCounts)
+      .filter(k => nivelCounts[k] > 0)
+      .map(k => ({ name: k, value: nivelCounts[k] }));
+
+    return { barData, pieData };
+  }, [jobs]);
+
   const totalJobs = jobs.length;
   const uniqueCompanies = new Set(jobs.map((j) => j.empresa)).size;
   const sourcesCount = 3;
@@ -133,7 +201,7 @@ function App() {
     <div className="min-h-screen bg-[#070b14] text-slate-100 p-6 md:p-10 font-sans flex flex-col justify-between">
       <div className="max-w-7xl mx-auto space-y-6 w-full">
         
-        {/* Header Superior idêntico ao Figma */}
+        {/* Header Superior */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-[#0b1329] border border-blue-950/50 p-6 rounded-2xl gap-4 shadow-xl">
           <div className="flex items-center gap-4">
             <div className="bg-blue-600 text-white font-black px-3.5 py-2.5 rounded-xl text-sm tracking-wider shadow-md">JS</div>
@@ -159,10 +227,16 @@ function App() {
         </header>
 
         {/* Subtítulo do Pipeline */}
-        <div className="px-1">
+        <div className="px-1 flex justify-between items-center">
           <p className="text-xs text-slate-400 font-medium tracking-wide">
             Pipeline de Dados & Inteligência de Mercado em Tempo Real (FastAPI + React + TS)
           </p>
+          <button
+            onClick={handleExportCSV}
+            className="flex items-center gap-1.5 bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer"
+          >
+            <Download size={14} /> Exportar CSV ({filteredJobs.length})
+          </button>
         </div>
 
         {/* Cards de Métricas (KPIs) */}
@@ -209,6 +283,69 @@ function App() {
             </div>
             <div className="w-full bg-slate-800/80 h-1.5 rounded-full mt-5 overflow-hidden">
               <div className="bg-blue-500 h-full rounded-full w-1/3"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bloco de Gráficos de Inteligência de Mercado (Analytics) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* Gráfico de Barras: Top Tecnologias */}
+          <div className="bg-[#0b1329] border border-blue-950/40 p-6 rounded-2xl shadow-lg flex flex-col">
+            <div className="flex items-center gap-2 mb-4">
+              <BarChart3 size={18} className="text-blue-500" />
+              <h2 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Demanda por Tecnologias</h2>
+            </div>
+            <div className="h-64 w-full">
+              {analyticsData.barData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={analyticsData.barData} margin={{ top: 10, right: 10, left: -20, bottom: 25 }}>
+                    <XAxis dataKey="name" stroke="#64748b" fontSize={11} angle={-30} textAnchor="end" />
+                    <YAxis stroke="#64748b" fontSize={11} allowDecimals={false} />
+                    <Tooltip contentStyle={{ backgroundColor: '#050811', borderColor: '#1e3a8a', borderRadius: '12px', fontSize: '12px' }} />
+                    <Bar dataKey="vagas" fill="#3b82f6" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                  Execute uma coleta para gerar estatísticas de tecnologias.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Gráfico de Pizza: Distribuição por Senioridade */}
+          <div className="bg-[#0b1329] border border-blue-950/40 p-6 rounded-2xl shadow-lg flex flex-col">
+            <div className="flex items-center gap-2 mb-4">
+              <PieIcon size={18} className="text-purple-400" />
+              <h2 className="text-xs font-bold text-slate-200 uppercase tracking-wider">Distribuição por Senioridade</h2>
+            </div>
+            <div className="h-64 w-full flex items-center justify-center">
+              {analyticsData.pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={analyticsData.pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={85}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                      labelLine={false}
+                    >
+                      {analyticsData.pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#050811', borderColor: '#1e3a8a', borderRadius: '12px', fontSize: '12px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-xs text-slate-500">
+                  Execute uma coleta para gerar estatísticas de senioridade.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -384,7 +521,12 @@ function App() {
               <tbody className="divide-y divide-blue-950/20 text-sm">
                 {filteredJobs.length > 0 ? (
                   filteredJobs.map((job, index) => (
-                    <tr key={index} className="hover:bg-blue-950/10 transition">
+                    <tr 
+                      key={index} 
+                      onClick={() => setVagaSelecionada(job)}
+                      className="hover:bg-blue-950/20 transition cursor-pointer"
+                      title="Clique para ver os detalhes completos"
+                    >
                       <td className="py-4 px-4 font-semibold text-slate-200">
                         {job.titulo_vaga}
                         {job.nivel && job.nivel !== 'Não Especificado' && (
@@ -425,19 +567,28 @@ function App() {
                           </span>
                         </td>
                       )}
-                      <td className="py-4 px-4 text-right">
-                        {job.link && job.link !== 'N/A' ? (
-                          <a
-                            href={job.link}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 text-xs font-bold inline-flex items-center gap-1 transition"
+                      <td className="py-4 px-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => setVagaSelecionada(job)}
+                            className="text-slate-400 hover:text-slate-200 text-xs font-bold inline-flex items-center gap-1 transition p-1 bg-slate-800/50 rounded-lg border border-slate-700/50"
+                            title="Detalhes"
                           >
-                            Ver Vaga <ExternalLink size={12} />
-                          </a>
-                        ) : (
-                          <span className="text-slate-600 text-xs font-medium">Indisponível</span>
-                        )}
+                            <Eye size={14} />
+                          </button>
+                          {job.link && job.link !== 'N/A' ? (
+                            <a
+                              href={job.link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 text-xs font-bold inline-flex items-center gap-1 transition"
+                            >
+                              Ver Vaga <ExternalLink size={12} />
+                            </a>
+                          ) : (
+                            <span className="text-slate-600 text-xs font-medium">Indisponível</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -453,6 +604,77 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* Modal de Detalhes da Vaga */}
+      {vagaSelecionada && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1329] border border-blue-950/80 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-5 relative">
+            <button
+              onClick={() => setVagaSelecionada(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-white bg-[#050811] p-2 rounded-xl border border-blue-950/60 transition cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <span className={`w-10 h-10 rounded-xl font-extrabold text-sm flex items-center justify-center ${getCompanyStyles(vagaSelecionada.empresa)}`}>
+                {vagaSelecionada.empresa.charAt(0)}
+              </span>
+              <div>
+                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${getSourceStyles(vagaSelecionada.fonte)} mb-1`}>
+                  @{vagaSelecionada.fonte}
+                </span>
+                <h3 className="text-lg font-bold text-white leading-tight">{vagaSelecionada.titulo_vaga}</h3>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 bg-[#050811] p-4 rounded-xl border border-blue-950/60 text-xs">
+              <div>
+                <span className="text-slate-500 block uppercase font-bold tracking-wider">Empresa</span>
+                <span className="text-slate-200 font-semibold text-sm">{vagaSelecionada.empresa}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block uppercase font-bold tracking-wider">Senioridade</span>
+                <span className="text-blue-400 font-semibold text-sm">{vagaSelecionada.nivel || 'Não Especificado'}</span>
+              </div>
+              {vagaSelecionada.match_score !== undefined && (
+                <div className="col-span-2 pt-2 border-t border-blue-950/40 mt-1 flex justify-between items-center">
+                  <span className="text-slate-400 uppercase font-bold tracking-wider">Compatibilidade (IA Match)</span>
+                  <span className="text-emerald-400 font-black text-sm bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                    {vagaSelecionada.match_score}% de Match
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Link Oficial da Vaga</span>
+              <div className="bg-[#050811] p-3 rounded-xl border border-blue-950/60 text-xs font-mono text-blue-400 truncate">
+                {vagaSelecionada.link && vagaSelecionada.link !== 'N/A' ? vagaSelecionada.link : 'Link direto indisponível'}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setVagaSelecionada(null)}
+                className="bg-[#050811] hover:bg-slate-800 text-slate-300 px-4 py-2.5 rounded-xl text-xs font-bold transition border border-blue-950/60 cursor-pointer"
+              >
+                Fechar
+              </button>
+              {vagaSelecionada.link && vagaSelecionada.link !== 'N/A' && (
+                <a
+                  href={vagaSelecionada.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-blue-600/30 cursor-pointer"
+                >
+                  Acessar Vaga Original <ExternalLink size={14} />
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rodapé da Página com links para LinkedIn e GitHub */}
       <footer className="max-w-7xl w-full mx-auto border-t border-blue-950/60 pt-6 pb-4 flex flex-col md:flex-row justify-between items-center text-xs text-slate-400 gap-4 mt-12">
