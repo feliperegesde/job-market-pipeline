@@ -186,9 +186,10 @@ http://localhost:8000/docs
 
 ### 5. Start the React frontend
 
-Open a **second terminal** and navigate to the frontend:
+Open a **second terminal** and navigate to the frontend: (sorry i created 2 folders name client)
 
 ```bash
+cd client
 cd client
 ```
 
@@ -196,6 +197,7 @@ Install the dependencies:
 
 ```bash
 npm install --legacy-peer-deps
+npm install recharts
 ```
 
 Start the development server:

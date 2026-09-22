@@ -8,4 +8,5 @@ export interface Job {
   descricao?: string;
   nivel?: string; // Estágio, Junior, Pleno, Senior
   match_score?: number;
+  skills_faltantes?: string[];
 }
